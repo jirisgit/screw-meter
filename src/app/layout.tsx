@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "ScrewMeter — ISO Metric Screw Reference",
+  title: "Screw-Meter — ISO Metric Screw Reference",
   description: "Instant M-screw measurements for 3D design: head diameter, nut dimensions, clearance holes, hex key sizes. ISO 4762 / ISO 4032.",
 };
 

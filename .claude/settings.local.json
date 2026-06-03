@@ -4,7 +4,10 @@
       "Bash(npx next *)",
       "Bash(git init *)",
       "Bash(git add *)",
-      "Bash(git commit *)"
+      "Bash(git commit *)",
+      "Bash(git config *)",
+      "Bash(winget install *)",
+      "PowerShell($env:PATH += \";C:\\\\Program Files\\\\GitHub CLI\"; cd \"C:\\\\Users\\\\jirib\\\\Documents\\\\CODE\\\\screw-meter\"; git branch -m master main 2>&1; gh repo create screw-meter --public --source=. --remote=origin --push 2>&1)"
     ]
   }
 }

@@ -144,7 +144,7 @@ export default function Home() {
       <div className="border-b border-[#0f1e2a] px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="w-2 h-2 rounded-full bg-[#00e5ff] shadow-[0_0_8px_#00e5ff]" />
-          <span className="text-[#00e5ff] text-sm tracking-[0.2em] uppercase">ScrewMeter</span>
+          <span className="text-[#00e5ff] text-sm tracking-[0.2em] uppercase">Screw-Meter</span>
           <span className="text-[#1a3a4a] text-xs hidden sm:inline">// ISO metric reference</span>
         </div>
         <span className="text-[#1a3a4a] text-xs">v1.0</span>
