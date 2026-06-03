@@ -216,6 +216,9 @@ export function NutTopView({ data, scale }: { data: ScrewData; scale: number }) 
 
   const dimY   = TITLE + ABOVE - 28;
   const c2cX   = CX + c2cR + 46;
+  // Wider canvas so the C2C label (right of dim line) is never clipped.
+  // CX stays at 220 — only the right margin grows.
+  const NUT_W  = 520;
 
   // Pointy-top hex: vertex straight up/down → clean vertical C2C dim line
   const hexPts = Array.from({ length: 6 }).map((_, i) => {
@@ -224,7 +227,7 @@ export function NutTopView({ data, scale }: { data: ScrewData; scale: number }) 
   }).join(" ");
 
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ background: BG, borderRadius: 8 }}>
+    <svg viewBox={`0 0 ${NUT_W} ${H}`} className="w-full" style={{ background: BG, borderRadius: 8 }}>
       <text x={CX} y={20} textAnchor="middle" fill={ACCENT} fontSize={13}
         fontFamily="monospace" fontWeight="bold" letterSpacing="2">
         {data.size}  NUT — TOP VIEW
