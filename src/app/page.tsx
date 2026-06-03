@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { findScrew, screwDatabase, ScrewData } from "@/lib/screwData";
-import { ScrewDiagram, NutDiagram } from "@/components/ScrewDiagram";
+import { computeScale, ScrewSideView, ScrewTopView, NutTopView, NutSideView } from "@/components/ScrewDiagram";
 
 const COMMON_SIZES  = ["M1", "M1.2", "M1.6", "M2", "M2.5", "M3", "M4", "M5", "M6", "M8"];
 const EXTENDED_SIZES = screwDatabase.map(s => s.size).filter(s => !COMMON_SIZES.includes(s));
@@ -199,31 +199,41 @@ export default function Home() {
               </div>
             </div>
 
-            {/* ── DRAWINGS + STATS ── */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-
-              {/* LEFT: stacked diagrams */}
-              <div className="space-y-4">
-                <div className="text-[#2a4a5a] text-[10px] tracking-widest uppercase">&gt; technical drawings</div>
-                <ScrewDiagram data={result} />
-                <NutDiagram   data={result} />
-              </div>
-
-              {/* RIGHT: stat cards */}
-              <div className="space-y-4">
-                <div className="text-[#2a4a5a] text-[10px] tracking-widest uppercase">&gt; dimensions</div>
-                <div className="grid grid-cols-2 gap-2">
-                  <StatCard label="Thread Diameter"   value={result.threadDiameter}    unit="mm" sub="nominal thread ⌀" />
-                  <StatCard label="Head Diameter"      value={result.headDiameter}       unit="mm" sub="socket head cap" />
-                  <StatCard label="Head Height"        value={result.headHeight}         unit="mm" sub="ISO 4762" />
-                  <StatCard label="Hex Key Size"       value={result.hexKeySize}         unit="mm" sub="Allen key / hex wrench" />
-                  <StatCard label="Nut Flat↔Flat"      value={result.nutFlatToFlat}      unit="mm" sub="wrench size · ISO 4032" />
-                  <StatCard label="Nut Corner↔Corner"  value={result.nutCornerToCorner}  unit="mm" sub="min. clearance ⌀" />
-                  <StatCard label="Nut Height"         value={result.nutHeight}          unit="mm" sub="standard hex nut" />
-                  <StatCard label="Thread Pitch"       value={result.pitch}              unit="mm" sub="coarse thread" />
-                  <ClearanceBar clearance={result.clearanceHoleDiameter} thread={result.threadDiameter} />
+            {/* ── DRAWINGS ── */}
+            {(() => {
+              const scale = computeScale(result);
+              return (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="text-[#2a4a5a] text-[10px] tracking-widest uppercase">&gt; technical drawings</div>
+                    <div className="text-[#1a3a4a] text-[9px] font-mono">
+                      ISO 4762 socket head cap screw · internal hex socket (Allen key)
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <ScrewSideView data={result} scale={scale} />
+                    <ScrewTopView  data={result} scale={scale} />
+                    <NutTopView    data={result} scale={scale} />
+                    <NutSideView   data={result} scale={scale} />
+                  </div>
                 </div>
+              );
+            })()}
+
+            {/* ── STATS ── */}
+            <div className="space-y-4">
+              <div className="text-[#2a4a5a] text-[10px] tracking-widest uppercase">&gt; dimensions</div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                <StatCard label="Thread Diameter"   value={result.threadDiameter}    unit="mm" sub="nominal thread ⌀" />
+                <StatCard label="Head Diameter"      value={result.headDiameter}       unit="mm" sub="socket head cap" />
+                <StatCard label="Head Height"        value={result.headHeight}         unit="mm" sub="ISO 4762" />
+                <StatCard label="Hex Key Size"       value={result.hexKeySize}         unit="mm" sub="Allen key · hex socket" />
+                <StatCard label="Nut Flat↔Flat"      value={result.nutFlatToFlat}      unit="mm" sub="wrench size · ISO 4032" />
+                <StatCard label="Nut Corner↔Corner"  value={result.nutCornerToCorner}  unit="mm" sub="min. clearance ⌀" />
+                <StatCard label="Nut Height"         value={result.nutHeight}          unit="mm" sub="standard hex nut" />
+                <StatCard label="Thread Pitch"       value={result.pitch}              unit="mm" sub="coarse thread" />
               </div>
+              <ClearanceBar clearance={result.clearanceHoleDiameter} thread={result.threadDiameter} />
             </div>
 
             {/* ── FULL SPEC TABLE ── */}

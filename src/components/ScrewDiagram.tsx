@@ -2,259 +2,324 @@
 
 import { ScrewData } from "@/lib/screwData";
 
-interface Props { data: ScrewData; }
+const ACCENT = "#00e5ff";
+const DIM    = "#4a9eba";
+const BG     = "#0a0e1a";
+const SURF   = "#0f1b27";
+const W      = 440;
+const CX     = 220;
 
-const ACCENT  = "#00e5ff";
-const DIM     = "#4a9eba";
-const BG      = "#0a0e1a";
-const SURFACE = "#0f1b27";
+// All 4 views share this scale so 1 mm = same pixels everywhere
+export function computeScale(data: ScrewData): number {
+  return 300 / Math.max(data.headDiameter, data.nutCornerToCorner);
+}
 
-/* ─────────────────────────────────────────────────────────────────────────
-   SCREW SIDE VIEW
-───────────────────────────────────────────────────────────────────────── */
-export function ScrewDiagram({ data }: Props) {
-  const W = 440;
+// ── dim helpers ────────────────────────────────────────────────────────────
 
-  // Scale so the head is always ~110 px radius → drawing fills width nicely
-  const scale      = 220 / data.headDiameter;          // px per mm
-  const headR      = (data.headDiameter  / 2) * scale; // ≈ 110 px
-  const threadR    = (data.threadDiameter / 2) * scale;
-  const headH      = Math.max(data.headHeight * scale, 30);
-  const hexR       = (data.hexKeySize / 2) * scale;
-  const chamferH   = threadR * 0.7;
-  const shaftLen   = Math.max(headH * 1.3, threadR * 3.5, 75);
+function DimH({ x1, x2, y, label, above = true, wy }: {
+  x1: number; x2: number; y: number; label: string; above?: boolean; wy?: number;
+}) {
+  const mx = (x1 + x2) / 2;
+  const lY = above ? y - 7 : y + 16;
+  return (
+    <g>
+      {wy !== undefined && <>
+        <line x1={x1} y1={wy} x2={x1} y2={y} stroke={DIM} strokeWidth={0.85} strokeDasharray="4,3" opacity={0.55}/>
+        <line x1={x2} y1={wy} x2={x2} y2={y} stroke={DIM} strokeWidth={0.85} strokeDasharray="4,3" opacity={0.55}/>
+      </>}
+      <line x1={x1} y1={y} x2={x2} y2={y} stroke={DIM} strokeWidth={1.3}/>
+      <polygon points={`${x1},${y} ${x1+9},${y-4} ${x1+9},${y+4}`} fill={DIM}/>
+      <polygon points={`${x2},${y} ${x2-9},${y-4} ${x2-9},${y+4}`} fill={DIM}/>
+      <rect x={mx-50} y={above ? y-20 : y+3} width={100} height={15} fill={BG}/>
+      <text x={mx} y={lY} textAnchor="middle" fill={DIM} fontSize={12} fontFamily="monospace" fontWeight="bold">{label}</text>
+    </g>
+  );
+}
 
-  // Vertical layout budgets
-  const titleH     = 58;   // reserved for title block
-  const dimAbove   = 52;   // space for head-diameter dim line
-  const headTop    = titleH + dimAbove;
-  const headBot    = headTop + headH;
-  const shaftBot   = headBot + shaftLen;
-  const tipBot     = shaftBot + chamferH;
-  const dimBelow   = 60;   // space for thread-diameter dim line
-  const H          = Math.ceil(tipBot + dimBelow);
+function DimV({ x, y1, y2, label, right = true, wx }: {
+  x: number; y1: number; y2: number; label: string; right?: boolean; wx?: number;
+}) {
+  const my = (y1 + y2) / 2;
+  return (
+    <g>
+      {wx !== undefined && <>
+        <line x1={wx} y1={y1} x2={x} y2={y1} stroke={DIM} strokeWidth={0.85} strokeDasharray="4,3" opacity={0.55}/>
+        <line x1={wx} y1={y2} x2={x} y2={y2} stroke={DIM} strokeWidth={0.85} strokeDasharray="4,3" opacity={0.55}/>
+      </>}
+      <line x1={x} y1={y1} x2={x} y2={y2} stroke={DIM} strokeWidth={1.3}/>
+      <polygon points={`${x},${y1} ${x-4},${y1+9} ${x+4},${y1+9}`} fill={DIM}/>
+      <polygon points={`${x},${y2} ${x-4},${y2-9} ${x+4},${y2-9}`} fill={DIM}/>
+      <text x={right ? x+8 : x-8} y={my+4} textAnchor={right ? "start" : "end"}
+        fill={DIM} fontSize={12} fontFamily="monospace" fontWeight="bold">{label}</text>
+    </g>
+  );
+}
 
-  const cx         = W / 2;
-  const headDimY   = headTop - 30;          // dim line above head
-  const threadDimY = tipBot  + 32;          // dim line below tip
-  const heightDimX = cx + headR + 56;       // vertical dim line to the right
+// ── 1. SCREW SIDE VIEW ─────────────────────────────────────────────────────
+// Hex socket shown as a rectangular notch — correct for a side view
 
-  // Hex socket — flat-top hexagon, top-centred in head
-  const hexCY = headTop + hexR + 6;
-  const hexPts = Array.from({ length: 6 }).map((_, i) => {
-    const a = (Math.PI / 3) * i + Math.PI / 6; // flat-top orientation
-    return `${cx + hexR * Math.cos(a)},${hexCY + hexR * Math.sin(a)}`;
-  }).join(" ");
+export function ScrewSideView({ data, scale }: { data: ScrewData; scale: number }) {
+  const headR    = (data.headDiameter   / 2) * scale;
+  const threadR  = (data.threadDiameter / 2) * scale;
+  const headH    = data.headHeight            * scale;
+  const socketW  = data.hexKeySize            * scale;          // notch width
+  const socketD  = data.hexKeySize * 0.75     * scale;          // notch depth (approx ISO)
+  const chamferH = threadR * 0.65;
+  const shaftH   = Math.max(data.headHeight * 2 * scale, threadR * 4, 60);
+
+  const TITLE  = 50;
+  const ABOVE  = 50;
+  const headTop  = TITLE + ABOVE;
+  const headBot  = headTop + headH;
+  const shaftBot = headBot + shaftH;
+  const tipBot   = shaftBot + chamferH;
+  const BELOW  = 58;
+  const H      = Math.ceil(tipBot + BELOW);
+
+  const headDimY   = headTop - 28;
+  const threadDimY = tipBot  + 32;
+  const hDimX      = CX + headR + 46;
 
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ background: BG, borderRadius: 8 }}>
-
-      {/* ── TITLE ── */}
-      <text x={cx} y={22} textAnchor="middle" fill={ACCENT} fontSize={14}
+      <text x={CX} y={20} textAnchor="middle" fill={ACCENT} fontSize={13}
         fontFamily="monospace" fontWeight="bold" letterSpacing="2">
-        {data.size}  SOCKET HEAD CAP SCREW
+        {data.size}  SCREW — SIDE VIEW
       </text>
-      <text x={cx} y={40} textAnchor="middle" fill="#2a5a6a" fontSize={10} fontFamily="monospace">
-        ISO 4762 / DIN 912 · SIDE VIEW
-      </text>
-      <text x={cx} y={54} textAnchor="middle" fill="#1e3d4a" fontSize={9} fontFamily="monospace">
-        thread pitch  {data.pitch} mm  ·  coarse
+      <text x={CX} y={36} textAnchor="middle" fill="#2a5a6a" fontSize={9} fontFamily="monospace">
+        ISO 4762 · socket head cap · internal hex socket
       </text>
 
-      {/* ── HEAD BODY ── */}
-      <rect x={cx - headR} y={headTop} width={headR * 2} height={headH}
-        fill={SURFACE} stroke={ACCENT} strokeWidth={1.5} />
+      {/* head body */}
+      <rect x={CX-headR} y={headTop} width={headR*2} height={headH}
+        fill={SURF} stroke={ACCENT} strokeWidth={1.5}/>
 
-      {/* ── HEX SOCKET ── */}
-      <polygon points={hexPts} fill="#040710" stroke={ACCENT} strokeWidth={1.2} opacity={0.95} />
+      {/* hex socket: rectangular notch centred at top of head — SIDE VIEW */}
+      <rect x={CX - socketW/2} y={headTop} width={socketW} height={socketD}
+        fill="#040810" stroke={ACCENT} strokeWidth={1}/>
 
-      {/* ── SHAFT ── */}
-      <rect x={cx - threadR} y={headBot} width={threadR * 2} height={shaftLen}
-        fill={SURFACE} stroke={ACCENT} strokeWidth={1.5} />
+      {/* shaft */}
+      <rect x={CX-threadR} y={headBot} width={threadR*2} height={shaftH}
+        fill={SURF} stroke={ACCENT} strokeWidth={1.5}/>
 
-      {/* Thread serration marks */}
-      {Array.from({ length: Math.floor(shaftLen / 10) }).map((_, i) => {
-        const y = headBot + 6 + i * 10;
+      {/* thread marks */}
+      {Array.from({ length: Math.floor(shaftH / 9) }).map((_, i) => {
+        const y = headBot + 6 + i * 9;
         if (y > shaftBot - 5) return null;
         return (
           <g key={i} opacity={0.28}>
-            <line x1={cx - threadR - 5} y1={y} x2={cx - threadR} y2={y + 5}
-              stroke={ACCENT} strokeWidth={1.2} />
-            <line x1={cx + threadR} y1={y} x2={cx + threadR + 5} y2={y + 5}
-              stroke={ACCENT} strokeWidth={1.2} />
+            <line x1={CX-threadR-5} y1={y} x2={CX-threadR} y2={y+5} stroke={ACCENT} strokeWidth={1.1}/>
+            <line x1={CX+threadR}   y1={y} x2={CX+threadR+5} y2={y+5} stroke={ACCENT} strokeWidth={1.1}/>
           </g>
         );
       })}
 
-      {/* ── CHAMFER TIP ── */}
+      {/* chamfer tip */}
       <polygon
-        points={`${cx - threadR},${shaftBot} ${cx + threadR},${shaftBot} ${cx + threadR * 0.5},${tipBot} ${cx - threadR * 0.5},${tipBot}`}
-        fill={SURFACE} stroke={ACCENT} strokeWidth={1.5} />
+        points={`${CX-threadR},${shaftBot} ${CX+threadR},${shaftBot} ${CX+threadR*0.5},${tipBot} ${CX-threadR*0.5},${tipBot}`}
+        fill={SURF} stroke={ACCENT} strokeWidth={1.5}/>
 
-      {/* ══ DIM: HEAD DIAMETER ══ */}
-      {/* witness lines */}
-      <line x1={cx - headR} y1={headTop - 2} x2={cx - headR} y2={headDimY + 3}
-        stroke={DIM} strokeWidth={0.9} strokeDasharray="4,3" opacity={0.65} />
-      <line x1={cx + headR} y1={headTop - 2} x2={cx + headR} y2={headDimY + 3}
-        stroke={DIM} strokeWidth={0.9} strokeDasharray="4,3" opacity={0.65} />
-      {/* dim line + arrows */}
-      <line x1={cx - headR} y1={headDimY} x2={cx + headR} y2={headDimY}
-        stroke={DIM} strokeWidth={1.3} />
-      <polygon points={`${cx - headR},${headDimY} ${cx - headR + 9},${headDimY - 4} ${cx - headR + 9},${headDimY + 4}`} fill={DIM} />
-      <polygon points={`${cx + headR},${headDimY} ${cx + headR - 9},${headDimY - 4} ${cx + headR - 9},${headDimY + 4}`} fill={DIM} />
-      {/* label on opaque background */}
-      <rect x={cx - 52} y={headDimY - 19} width={104} height={16} fill={BG} />
-      <text x={cx} y={headDimY - 6} textAnchor="middle" fill={DIM}
-        fontSize={13} fontFamily="monospace" fontWeight="bold">
-        ⌀ {data.headDiameter} mm
-      </text>
+      {/* dim: head diameter */}
+      <DimH x1={CX-headR} x2={CX+headR} y={headDimY}
+        label={`⌀ ${data.headDiameter} mm`} wy={headTop}/>
 
-      {/* ══ DIM: THREAD DIAMETER ══ */}
-      <line x1={cx - threadR} y1={tipBot + 2} x2={cx - threadR} y2={threadDimY - 3}
-        stroke={DIM} strokeWidth={0.9} strokeDasharray="4,3" opacity={0.65} />
-      <line x1={cx + threadR} y1={tipBot + 2} x2={cx + threadR} y2={threadDimY - 3}
-        stroke={DIM} strokeWidth={0.9} strokeDasharray="4,3" opacity={0.65} />
-      <line x1={cx - threadR} y1={threadDimY} x2={cx + threadR} y2={threadDimY}
-        stroke={DIM} strokeWidth={1.3} />
-      <polygon points={`${cx - threadR},${threadDimY} ${cx - threadR + 9},${threadDimY - 4} ${cx - threadR + 9},${threadDimY + 4}`} fill={DIM} />
-      <polygon points={`${cx + threadR},${threadDimY} ${cx + threadR - 9},${threadDimY - 4} ${cx + threadR - 9},${threadDimY + 4}`} fill={DIM} />
-      <rect x={cx - 52} y={threadDimY + 4} width={104} height={16} fill={BG} />
-      <text x={cx} y={threadDimY + 17} textAnchor="middle" fill={DIM}
-        fontSize={13} fontFamily="monospace" fontWeight="bold">
-        ⌀ {data.threadDiameter} mm
-      </text>
+      {/* dim: thread diameter */}
+      <DimH x1={CX-threadR} x2={CX+threadR} y={threadDimY}
+        label={`⌀ ${data.threadDiameter} mm`} above={false} wy={tipBot}/>
 
-      {/* ══ DIM: HEAD HEIGHT ══ */}
-      <line x1={cx + headR + 2} y1={headTop} x2={heightDimX - 3} y2={headTop}
-        stroke={DIM} strokeWidth={0.9} strokeDasharray="4,3" opacity={0.65} />
-      <line x1={cx + headR + 2} y1={headBot} x2={heightDimX - 3} y2={headBot}
-        stroke={DIM} strokeWidth={0.9} strokeDasharray="4,3" opacity={0.65} />
-      <line x1={heightDimX} y1={headTop} x2={heightDimX} y2={headBot}
-        stroke={DIM} strokeWidth={1.3} />
-      <polygon points={`${heightDimX},${headTop} ${heightDimX - 4},${headTop + 9} ${heightDimX + 4},${headTop + 9}`} fill={DIM} />
-      <polygon points={`${heightDimX},${headBot} ${heightDimX - 4},${headBot - 9} ${heightDimX + 4},${headBot - 9}`} fill={DIM} />
-      <text x={heightDimX + 8} y={(headTop + headBot) / 2 + 5}
-        textAnchor="start" fill={DIM} fontSize={13} fontFamily="monospace" fontWeight="bold">
-        {data.headHeight} mm
-      </text>
+      {/* dim: head height */}
+      <DimV x={hDimX} y1={headTop} y2={headBot}
+        label={`${data.headHeight} mm`} wx={CX+headR}/>
 
-      {/* ══ HEX KEY CALLOUT (leader line from socket to left margin) ══ */}
-      <line x1={cx - hexR - 2} y1={hexCY} x2={cx - headR - 28} y2={hexCY}
-        stroke={DIM} strokeWidth={0.9} opacity={0.55} strokeDasharray="3,2" />
-      <text x={cx - headR - 32} y={hexCY + 4} textAnchor="end"
-        fill={DIM} fontSize={12} fontFamily="monospace">
+      {/* hex socket callout */}
+      <line x1={CX - socketW/2} y1={headTop + socketD/2}
+        x2={CX - headR - 28}   y2={headTop + socketD/2}
+        stroke={DIM} strokeWidth={0.85} strokeDasharray="3,2" opacity={0.6}/>
+      <text x={CX - headR - 32} y={headTop + socketD/2 + 4}
+        textAnchor="end" fill={DIM} fontSize={11} fontFamily="monospace">
         ⬡ {data.hexKeySize} mm
       </text>
     </svg>
   );
 }
 
-/* ─────────────────────────────────────────────────────────────────────────
-   NUT TOP VIEW
-───────────────────────────────────────────────────────────────────────── */
-export function NutDiagram({ data }: Props) {
-  const W   = 440;
-  const H   = 380;
-  const cx  = W / 2;
-  const cy  = 195;
+// ── 2. SCREW TOP VIEW ──────────────────────────────────────────────────────
+// Head shown as circle; hex socket shown as hexagon — correct for top view
 
-  // Scale: flat-to-flat always ≈ 110 px radius
-  const scale    = 220 / data.nutFlatToFlat;   // px per mm
-  const f2fR     = (data.nutFlatToFlat / 2) * scale;   // ≈ 110 px
-  const c2cR     = (data.nutCornerToCorner / 2) * scale;
-  const threadR  = (data.threadDiameter / 2) * scale;
+export function ScrewTopView({ data, scale }: { data: ScrewData; scale: number }) {
+  const headR = (data.headDiameter / 2) * scale;
+  const hexR  = (data.hexKeySize   / 2) * scale;
 
-  // Pointy-top hex (vertex straight up + down — clean vertical C2C dim)
+  const TITLE = 50;
+  const ABOVE = 48;
+  const cy    = TITLE + ABOVE + headR;
+  const H     = Math.ceil(cy + headR + 30);
+
+  const dimY  = TITLE + ABOVE - 28;
+
+  // Hex socket: flat-top orientation (angle = i*60°)
   const hexPts = Array.from({ length: 6 }).map((_, i) => {
-    const a = (Math.PI / 3) * i - Math.PI / 2; // first vertex at top
-    return `${cx + c2cR * Math.cos(a)},${cy + c2cR * Math.sin(a)}`;
+    const a = (Math.PI / 3) * i;
+    return `${CX + hexR * Math.cos(a)},${cy + hexR * Math.sin(a)}`;
   }).join(" ");
 
-  // Dim line positions
-  const f2fDimY   = cy;                   // F2F line right through horizontal centre
-  const c2cDimX   = cx + c2cR + 48;      // C2C line to the right of hex
+  // leader end-point: upper-right hex vertex
+  const lx = CX + hexR * Math.cos(0);
+  const ly = cy + hexR * Math.sin(0);
 
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ background: BG, borderRadius: 8 }}>
-
-      {/* ── TITLE ── */}
-      <text x={cx} y={22} textAnchor="middle" fill={ACCENT} fontSize={14}
+      <text x={CX} y={20} textAnchor="middle" fill={ACCENT} fontSize={13}
         fontFamily="monospace" fontWeight="bold" letterSpacing="2">
-        {data.size}  HEX NUT
+        {data.size}  SCREW — TOP VIEW
       </text>
-      <text x={cx} y={38} textAnchor="middle" fill="#2a5a6a" fontSize={10} fontFamily="monospace">
-        ISO 4032 / DIN 934 · TOP VIEW
+      <text x={CX} y={36} textAnchor="middle" fill="#2a5a6a" fontSize={9} fontFamily="monospace">
+        ISO 4762 · looking into hex socket
       </text>
 
-      {/* ── HEX BODY ── */}
-      <polygon points={hexPts} fill={SURFACE} stroke={ACCENT} strokeWidth={1.5} />
+      {/* head circle */}
+      <circle cx={CX} cy={cy} r={headR} fill={SURF} stroke={ACCENT} strokeWidth={1.5}/>
 
-      {/* Face-centre dots */}
+      {/* hex socket */}
+      <polygon points={hexPts} fill="#040810" stroke={ACCENT} strokeWidth={1.2}/>
+
+      {/* centre mark */}
+      <line x1={CX-4} y1={cy} x2={CX+4} y2={cy} stroke={ACCENT} strokeWidth={0.8} opacity={0.4}/>
+      <line x1={CX} y1={cy-4} x2={CX} y2={cy+4} stroke={ACCENT} strokeWidth={0.8} opacity={0.4}/>
+
+      {/* dim: head diameter */}
+      <DimH x1={CX-headR} x2={CX+headR} y={dimY}
+        label={`⌀ ${data.headDiameter} mm`} wy={cy}/>
+
+      {/* hex socket leader */}
+      <line x1={lx} y1={ly} x2={CX+headR+20} y2={cy+headR*0.35}
+        stroke={DIM} strokeWidth={0.85} strokeDasharray="3,2" opacity={0.6}/>
+      <text x={CX+headR+24} y={cy+headR*0.35+4}
+        textAnchor="start" fill={DIM} fontSize={11} fontFamily="monospace">
+        ⬡ {data.hexKeySize} mm
+      </text>
+    </svg>
+  );
+}
+
+// ── 3. NUT TOP VIEW ────────────────────────────────────────────────────────
+
+export function NutTopView({ data, scale }: { data: ScrewData; scale: number }) {
+  const c2cR   = (data.nutCornerToCorner / 2) * scale;  // ≈ 150 px always
+  const f2fR   = (data.nutFlatToFlat     / 2) * scale;
+  const tR     = (data.threadDiameter    / 2) * scale;
+
+  const TITLE  = 50;
+  const ABOVE  = 50;
+  const cy     = TITLE + ABOVE + c2cR;
+  const H      = Math.ceil(cy + c2cR + 30);
+
+  const dimY   = TITLE + ABOVE - 28;
+  const c2cX   = CX + c2cR + 46;
+
+  // Pointy-top hex: vertex straight up/down → clean vertical C2C dim line
+  const hexPts = Array.from({ length: 6 }).map((_, i) => {
+    const a = (Math.PI / 3) * i - Math.PI / 2;
+    return `${CX + c2cR * Math.cos(a)},${cy + c2cR * Math.sin(a)}`;
+  }).join(" ");
+
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ background: BG, borderRadius: 8 }}>
+      <text x={CX} y={20} textAnchor="middle" fill={ACCENT} fontSize={13}
+        fontFamily="monospace" fontWeight="bold" letterSpacing="2">
+        {data.size}  NUT — TOP VIEW
+      </text>
+      <text x={CX} y={36} textAnchor="middle" fill="#2a5a6a" fontSize={9} fontFamily="monospace">
+        ISO 4032 / DIN 934
+      </text>
+
+      {/* hex body */}
+      <polygon points={hexPts} fill={SURF} stroke={ACCENT} strokeWidth={1.5}/>
+
+      {/* face-centre dots */}
       {Array.from({ length: 6 }).map((_, i) => {
-        const a1 = (Math.PI / 3) * i     - Math.PI / 2;
-        const a2 = (Math.PI / 3) * (i+1) - Math.PI / 2;
-        const mx = cx + f2fR * Math.cos((a1 + a2) / 2);
-        const my = cy + f2fR * Math.sin((a1 + a2) / 2);
-        return <circle key={i} cx={mx} cy={my} r={2.5} fill={ACCENT} opacity={0.35} />;
+        const a = (Math.PI / 3) * i - Math.PI / 2 + Math.PI / 6;
+        return <circle key={i} cx={CX + f2fR*Math.cos(a)} cy={cy + f2fR*Math.sin(a)} r={2.5} fill={ACCENT} opacity={0.28}/>;
       })}
 
-      {/* ── THREAD HOLE ── */}
-      <circle cx={cx} cy={cy} r={threadR}
-        fill="#040710" stroke={ACCENT} strokeWidth={1.2} opacity={0.95} />
-      {/* hole cross-hatch */}
-      <line x1={cx - threadR + 3} y1={cy} x2={cx + threadR - 3} y2={cy}
-        stroke={ACCENT} strokeWidth={0.7} opacity={0.3} />
-      <line x1={cx} y1={cy - threadR + 3} x2={cx} y2={cy + threadR - 3}
-        stroke={ACCENT} strokeWidth={0.7} opacity={0.3} />
+      {/* thread hole */}
+      <circle cx={CX} cy={cy} r={tR} fill="#040810" stroke={ACCENT} strokeWidth={1.2}/>
+      <line x1={CX-tR+3} y1={cy} x2={CX+tR-3} y2={cy} stroke={ACCENT} strokeWidth={0.7} opacity={0.35}/>
+      <line x1={CX} y1={cy-tR+3} x2={CX} y2={cy+tR-3} stroke={ACCENT} strokeWidth={0.7} opacity={0.35}/>
 
-      {/* ══ DIM: FLAT-TO-FLAT (horizontal through centre) ══ */}
-      {/* The flat midpoints are at (cx ± f2fR, cy) for this hex orientation */}
-      <line x1={cx - f2fR} y1={f2fDimY} x2={cx + f2fR} y2={f2fDimY}
-        stroke={DIM} strokeWidth={1.3} />
-      <polygon points={`${cx - f2fR},${f2fDimY} ${cx - f2fR + 9},${f2fDimY - 4} ${cx - f2fR + 9},${f2fDimY + 4}`} fill={DIM} />
-      <polygon points={`${cx + f2fR},${f2fDimY} ${cx + f2fR - 9},${f2fDimY - 4} ${cx + f2fR - 9},${f2fDimY + 4}`} fill={DIM} />
-      <rect x={cx - 56} y={f2fDimY - 21} width={112} height={16} fill={BG} />
-      <text x={cx} y={f2fDimY - 8} textAnchor="middle" fill={DIM}
-        fontSize={13} fontFamily="monospace" fontWeight="bold">
-        ⌀F {data.nutFlatToFlat} mm
-      </text>
-      <text x={cx} y={f2fDimY + 26} textAnchor="middle" fill="#1e3d4a"
-        fontSize={9} fontFamily="monospace">
-        flat-to-flat  ·  wrench size
+      {/* dim: F2F — witnesses from flat-face midpoints (y=cy) up to dim line */}
+      <DimH x1={CX-f2fR} x2={CX+f2fR} y={dimY}
+        label={`${data.nutFlatToFlat} mm`} wy={cy}/>
+      <text x={CX} y={dimY+15} textAnchor="middle" fill="#1a3a4a" fontSize={8} fontFamily="monospace">
+        flat-to-flat · wrench size
       </text>
 
-      {/* ══ DIM: CORNER-TO-CORNER (vertical, right side) ══ */}
-      {/* Top corner: (cx, cy-c2cR)  Bottom corner: (cx, cy+c2cR) */}
-      <line x1={cx} y1={cy - c2cR} x2={c2cDimX - 3} y2={cy - c2cR}
-        stroke={DIM} strokeWidth={0.9} strokeDasharray="4,3" opacity={0.65} />
-      <line x1={cx} y1={cy + c2cR} x2={c2cDimX - 3} y2={cy + c2cR}
-        stroke={DIM} strokeWidth={0.9} strokeDasharray="4,3" opacity={0.65} />
-      <line x1={c2cDimX} y1={cy - c2cR} x2={c2cDimX} y2={cy + c2cR}
-        stroke={DIM} strokeWidth={1.3} />
-      <polygon points={`${c2cDimX},${cy - c2cR} ${c2cDimX - 4},${cy - c2cR + 9} ${c2cDimX + 4},${cy - c2cR + 9}`} fill={DIM} />
-      <polygon points={`${c2cDimX},${cy + c2cR} ${c2cDimX - 4},${cy + c2cR - 9} ${c2cDimX + 4},${cy + c2cR - 9}`} fill={DIM} />
-      <text x={c2cDimX + 8} y={cy - 4} textAnchor="start" fill={DIM}
-        fontSize={12} fontFamily="monospace" fontWeight="bold">
-        ⌀C
+      {/* dim: C2C — witnesses from top/bottom vertices rightward */}
+      <DimV x={c2cX} y1={cy-c2cR} y2={cy+c2cR}
+        label={`${data.nutCornerToCorner} mm`} wx={CX}/>
+      <text x={c2cX+8} y={cy-c2cR-6} textAnchor="start" fill="#1a3a4a" fontSize={8} fontFamily="monospace">
+        corner-to-corner
       </text>
-      <text x={c2cDimX + 8} y={cy + 12} textAnchor="start" fill={DIM}
-        fontSize={12} fontFamily="monospace" fontWeight="bold">
-        {data.nutCornerToCorner}
+    </svg>
+  );
+}
+
+// ── 4. NUT SIDE VIEW ───────────────────────────────────────────────────────
+
+export function NutSideView({ data, scale }: { data: ScrewData; scale: number }) {
+  const nutW   = data.nutFlatToFlat  * scale;
+  const nutH   = data.nutHeight      * scale;
+  const tR     = (data.threadDiameter / 2) * scale;
+  const chamf  = Math.min(nutH * 0.14, 8);  // chamfer on corners
+
+  const TITLE  = 50;
+  const ABOVE  = 50;
+  const nutTop = TITLE + ABOVE;
+  const nutBot = nutTop + nutH;
+  const H      = Math.ceil(nutBot + 55);
+
+  const nx1    = CX - nutW / 2;
+  const nx2    = CX + nutW / 2;
+  const dimY   = nutTop - 28;
+  const hDimX  = nx2 + 46;
+
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ background: BG, borderRadius: 8 }}>
+      <text x={CX} y={20} textAnchor="middle" fill={ACCENT} fontSize={13}
+        fontFamily="monospace" fontWeight="bold" letterSpacing="2">
+        {data.size}  NUT — SIDE VIEW
       </text>
-      <text x={c2cDimX + 8} y={cy + 26} textAnchor="start" fill={DIM}
-        fontSize={10} fontFamily="monospace">
-        mm
+      <text x={CX} y={36} textAnchor="middle" fill="#2a5a6a" fontSize={9} fontFamily="monospace">
+        ISO 4032 · flat face towards viewer
       </text>
 
-      {/* ── NUT HEIGHT ── (label below) */}
-      <text x={cx} y={H - 36} textAnchor="middle" fill="#3a6a7a"
-        fontSize={11} fontFamily="monospace">
-        NUT HEIGHT
-      </text>
-      <text x={cx} y={H - 18} textAnchor="middle" fill={DIM}
-        fontSize={18} fontFamily="monospace" fontWeight="bold">
-        {data.nutHeight} mm
-      </text>
+      {/* nut body with chamfered corners */}
+      <polygon
+        points={`
+          ${nx1+chamf},${nutTop}
+          ${nx2-chamf},${nutTop}
+          ${nx2},${nutTop+chamf}
+          ${nx2},${nutBot-chamf}
+          ${nx2-chamf},${nutBot}
+          ${nx1+chamf},${nutBot}
+          ${nx1},${nutBot-chamf}
+          ${nx1},${nutTop+chamf}
+        `}
+        fill={SURF} stroke={ACCENT} strokeWidth={1.5}/>
+
+      {/* thread hole: shown as hidden (dashed) lines in side view */}
+      <line x1={CX-tR} y1={nutTop+2} x2={CX-tR} y2={nutBot-2}
+        stroke={ACCENT} strokeWidth={1} strokeDasharray="5,4" opacity={0.45}/>
+      <line x1={CX+tR} y1={nutTop+2} x2={CX+tR} y2={nutBot-2}
+        stroke={ACCENT} strokeWidth={1} strokeDasharray="5,4" opacity={0.45}/>
+
+      {/* dim: flat-to-flat width */}
+      <DimH x1={nx1} x2={nx2} y={dimY}
+        label={`${data.nutFlatToFlat} mm`} wy={nutTop}/>
+
+      {/* dim: nut height */}
+      <DimV x={hDimX} y1={nutTop} y2={nutBot}
+        label={`${data.nutHeight} mm`} wx={nx2}/>
     </svg>
   );
 }
